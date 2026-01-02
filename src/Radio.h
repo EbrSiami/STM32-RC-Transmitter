@@ -1,0 +1,54 @@
+/**
+ * @file Radio.h
+ * @author Ebrahim Siami
+ * @brief NRF24L01+ Communication Driver
+ * @version 2.1.3
+ * @date 2025-02-02
+ * 
+ * Defines the NRF24L01+ configuration pins and the data packet structure
+ * used for communication between the transmitter and receiver.
+ */
+
+#ifndef RADIO_H
+#define RADIO_H
+
+#include <Arduino.h>
+#include <RF24.h>
+
+// --- Hardware Pin Configuration (STM32 BluePill) ---
+#define RF_CE_PIN  PB8
+#define RF_CSN_PIN PB9
+
+/**
+ * @brief Control Data Packet Structure
+ * CRITICAL: This structure must match EXACTLY on the Receiver side.
+ * Total Size: 14 bytes (6 ints + 2 bools + padding/alignment)
+ */
+typedef struct {
+  int throttle;
+  int pitch;
+  int roll;
+  int yaw;
+  int aux1;    // Potentiometer / Switch
+  int aux2;    // Potentiometer / Switch
+  bool aux3;   // Digital Switch A
+  bool aux4;   // Digital Switch B
+} data_t;
+
+// Global Radio Object (Defined in Radio.cpp)
+extern RF24 radio;
+
+// --- Function Prototypes ---
+
+/**
+ * @brief Initializes the radio hardware and settings.
+ */
+void setupRadio();
+
+/**
+ * @brief Sends a single data packet.
+ * @param dataToSend The populated data structure.
+ */
+void sendRadioData(data_t dataToSend);
+
+#endif // RADIO_H
