@@ -109,7 +109,8 @@ For stable operation, please ensure the following hardware configurations:
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/STM32-RC-Transmitter.git
+   git clone https://github.com/EbrSiami/STM32-RC-Transmitter.git
+   ```
 
 2. Open the project folder in PlatformIO.
 
