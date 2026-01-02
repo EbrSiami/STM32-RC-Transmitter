@@ -131,7 +131,9 @@ This project is built upon logic and lines of code that you wrote. Thank you for
 *   **Lead Developer:** Ebrahim Siami
 *   **Core Logic & Inspiration:** Marya
 
-- **Libraries:** Powered by ```Adafruit_SSD1306```, ```RF24```, and ```Wire```.
+**Third Party Libraries:**
+
+- Powered by ```Adafruit_SSD1306```, ```RF24```, and ```Wire```.
 
 ---
 
