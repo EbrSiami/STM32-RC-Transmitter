@@ -2,10 +2,17 @@
  * @file DisplayManager.h
  * @author Ebrahim Siami
  * @brief Interface for OLED Display Management
- * @version 2.1.3
- * @date 2025-01-25
+ * @version 2.6.1
+ * @date 2026-01-06
 
  * Defines display states, menu items, and rendering prototypes.
+ *
+ * NEW Features (Update 2.6.1):
+ * 
+ * - Smart Throttle (Airplane/Quad modes).
+ * - Channel Inversion Menu.
+ * - Dynamic Refresh Rate.
+ * - Loop-decoupled Trim speed.
  */
 
 #pragma once
@@ -30,21 +37,22 @@ enum DisplayState {
     MENU,             // Settings Menu
     PAGE_INFO,        // About / Credits
     PAGE_CALIBRATION, // Stick Calibration (WIP)
-    PAGE_CH_INVERT    // Channel Inversion (WIP)
+    PAGE_CH_INVERT    // Channel Inversion
 };
 
 /**
  * @brief Items available in the Settings Menu.
+ * Order must match the switch-case loop in DisplayManager.cpp
  */
 enum SettingsMenu {
     SETTING_LIGHT_MODE,
     SETTING_BUZZER,
     SETTING_CH_INVERT,
     SETTING_RESET_TRIMS,
-    SETTING_CALIBRATION,
+    SETTING_THROTTLE_MODE, // <--- New Feature
     SETTING_INFO,
-    SETTING_BACK,     // Navigation Button (<<)
-    SETTING_TOTAL     // Sentinel value for loop limits
+    SETTING_BACK,          // Navigation Button (<<)
+    SETTING_TOTAL          // Sentinel value
 };
 
 // Global Display Object
@@ -61,25 +69,7 @@ void showSavingFeedback();
 
 /**
  * @brief Renders the entire UI based on the current state.
- * 
- * @param currentPage Current active screen.
- * @param trimsMenuIndex Cursor position in Trim menu.
- * @param settingsMenuIndex Cursor position in Settings menu.
- * @param settings Reference to global settings struct.
- * @param throttle Channel data...
- * @param pitch Channel data...
- * @param roll Channel data...
- * @param yaw Channel data...
- * @param aux1 Channel data...
- * @param aux2 Channel data...
- * @param aux3 Channel data...
- * @param aux4 Channel data...
- * @param voltage Battery voltage in Volts.
- * @param timerSelection Selected timer preset.
- * @param timerIsArmed Is the timer armed?
- * @param timerIsRunning Is the timer currently counting?
- * @param timerValue Remaining time in milliseconds.
- * @param isTimeEditMode Is the user currently editing the timer?
+ * Updated signature to include Invert Menu cursor.
  */
 void drawCurrentPage(
     DisplayState currentPage,
@@ -89,5 +79,6 @@ void drawCurrentPage(
     byte throttle, byte pitch, byte roll, byte yaw,
     byte aux1, byte aux2, bool aux3, bool aux4,
     float voltage,
-    int timerSelection, bool timerIsArmed, bool timerIsRunning, long timerValue, bool isTimeEditMode
+    int timerSelection, bool timerIsArmed, bool timerIsRunning, long timerValue, bool isTimeEditMode,
+    int invertMenuIndex // <--- New Argument
 );

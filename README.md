@@ -30,6 +30,20 @@ Features a responsive OLED interface, non-blocking menu system, custom mixing, a
 
 ---
 
+## 📝 Changelog
+
+### v2.6.1 - The "Performance" Update (Current)
+- **🚀 Airplane Mode:** Added Smart Throttle logic (Split-stick behavior) for fixed-wing aircraft vs. Quadcopters.
+- **⚡ Ultra-Low Latency:** Optimized radio loop to run at **250Hz (4ms)** by prioritizing packet transmission over display refresh.
+- **🔄 Channel Inverter:** New dedicated menu to reverse channel direction via software (saved to EEPROM).
+- **🔋 Power Optimization:** Fixed OLED refresh bottleneck, allowing the PA (Power Amplifier) to draw full current for maximum range.
+- **🎮 Improved UX:** Hold-to-adjust logic added for digital trims.
+
+### v2.1.3 - Initial Release
+- Basic 8-channel control, OLED dashboard, and NRF24L01 support.
+
+---
+
 ## 📂 Project Structure
 
 ```text
@@ -109,7 +123,8 @@ For stable operation, please ensure the following hardware configurations:
 ### Installation
 1. Clone the repository:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/STM32-RC-Transmitter.git
+   git clone https://github.com/EbrSiami/STM32-RC-Transmitter.git
+   ```
 
 2. Open the project folder in PlatformIO.
 
@@ -130,7 +145,9 @@ This project is built upon logic and lines of code that you wrote. Thank you for
 *   **Lead Developer:** Ebrahim Siami
 *   **Core Logic & Inspiration:** Marya
 
-- **Libraries:** Powered by ```Adafruit_SSD1306```, ```RF24```, and ```Wire```.
+**Third Party Libraries:**
+
+- Powered by ```Adafruit_SSD1306```, ```RF24```, and ```Wire```.
 
 ---
 

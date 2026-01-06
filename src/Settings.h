@@ -2,8 +2,8 @@
  * @file Settings.h
  * @author Ebrahim Siami
  * @brief EEPROM Data Structure Definition
- * @version 2.1.3
- * @date 2025-01-27
+ * @version 2.6.1
+ * @date 2026-01-07
  * 
  * This file defines the 'RadioSettings' structure used to persist 
  * configuration data (trims, channel inversions, UI preferences) 
@@ -24,4 +24,6 @@ struct RadioSettings {
     
     bool channelInverted[8];  // Inversion status for channels 1-8 (true = inverted)
     uint8_t timerProfile;     // Selected timer profile index
+
+    bool airplaneMode; // false = Normal (Center 50%), true = Airplane (Center 0%)
 };

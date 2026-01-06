@@ -25,14 +25,14 @@
  * Total Size: 14 bytes (6 ints + 2 bools + padding/alignment)
  */
 typedef struct {
-  int throttle;
-  int pitch;
-  int roll;
-  int yaw;
-  int aux1;    // Potentiometer / Switch
-  int aux2;    // Potentiometer / Switch
-  bool aux3;   // Digital Switch A
-  bool aux4;   // Digital Switch B
+  uint8_t throttle;
+  uint8_t pitch;
+  uint8_t roll;
+  uint8_t yaw;
+  uint8_t aux1;    // Potentiometer / Switch
+  uint8_t aux2;    // Potentiometer / Switch
+  uint8_t aux3;   // Digital Switch A
+  uint8_t aux4;   // Digital Switch B
 } data_t;
 
 // Global Radio Object (Defined in Radio.cpp)
