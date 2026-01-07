@@ -3,10 +3,13 @@
  * @author Ebrahim Siami
  * @brief NRF24L01+ Communication Driver
  * @version 2.1.3
- * @date 2025-02-02
+ * @date 2026-01-07
  * 
  * Defines the NRF24L01+ configuration pins and the data packet structure
  * used for communication between the transmitter and receiver.
+ * 
+ * Fixing Data Packet Structure
+ * 
  */
 
 #ifndef RADIO_H

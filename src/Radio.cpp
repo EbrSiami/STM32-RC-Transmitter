@@ -4,45 +4,60 @@
  * @brief NRF24L01+ Communication Driver
  * @version 2.1.3
  * @date 2025-02-01
+ *
+ * Description:
  * Handles initialization and data transmission using the RF24 library.
- * Configured for 250kbps data rate for maximum range.
+ * Configured for long-range, low-latency RC control.
  */
 
 #include "Radio.h"
 #include <SPI.h>
 
-// Initialize RF24 Object (CE Pin, CSN Pin)
+// =============================================================================
+// --- Configuration & Globals ---
+// =============================================================================
+
+// Initialize RF24 Object (CE Pin, CSN Pin defined in Radio.h)
 RF24 radio(RF_CE_PIN, RF_CSN_PIN);
 
 // Radio Pipe Address
-// This must match the address defined in the receiver code.
+// WARNING: This must strictly match the address defined in the Receiver firmware.
 const uint64_t pipeOut = 0xE8E8F0F0E1LL;
+
+// =============================================================================
+// --- Functions ---
+// =============================================================================
 
 /**
  * @brief Initializes the NRF24L01 module.
- * Configures Channel 100, 250kbps datarate, and MAX power.
- * Disables AutoAck for lower latency in RC control applications.
+ *
+ * Settings:
+ * - Channel: 100 (2.500 GHz - avoids most WiFi interference).
+ * - Data Rate: 250kbps (Offers maximum receiver sensitivity/range).
+ * - PA Level: MAX (Maximum transmission power).
+ * - AutoAck: Disabled (Provides fixed latency, similar to UDP).
  */
 void setupRadio() {
-  SPI.begin();
+    SPI.begin();
 
-  if (!radio.begin()) {
-    // Hardware failure handling (optional)
-    // Could toggle an LED or show error on OLED if needed.
-  }
+    if (!radio.begin()) {
+        // TODO: Handle hardware failure (e.g., Show "Radio Error" on OLED)
+        // For now, execution continues, but transmission will fail silently.
+    }
 
-  radio.openWritingPipe(pipeOut);
-  radio.setChannel(100);             // Interference-free channel (usually > WiFi freqs)
-  radio.setAutoAck(false);           // Disable Ack for one-way UDP-like protocol
-  radio.setDataRate(RF24_250KBPS);   // Longest range setting
-  radio.setPALevel(RF24_PA_MAX);     // Maximum power output
-  radio.stopListening();             // Transmitter mode only
+    radio.openWritingPipe(pipeOut);
+    radio.setChannel(100);
+    radio.setAutoAck(false);           // Disable ACK for consistent loop time
+    radio.setDataRate(RF24_250KBPS);   // Best range
+    radio.setPALevel(RF24_PA_MAX);     // Max power
+    radio.stopListening();             // Ensure Transmitter Mode
 }
 
 /**
- * @brief Transmits the control data packet.
+ * @brief Transmits the control data packet over the air.
+ * 
  * @param dataToSend The structured data packet containing channel values.
  */
 void sendRadioData(data_t dataToSend) {
-  radio.write(&dataToSend, sizeof(data_t)); 
+    radio.write(&dataToSend, sizeof(data_t));
 }

@@ -4,26 +4,39 @@
  * @brief EEPROM Data Structure Definition
  * @version 2.6.1
  * @date 2026-01-07
+ *
+ * Description:
+ * Defines the 'RadioSettings' structure used to persist configuration data
+ * (trims, channel inversions, UI preferences) into the external EEPROM.
  * 
- * This file defines the 'RadioSettings' structure used to persist 
- * configuration data (trims, channel inversions, UI preferences) 
- * into the external EEPROM.
+ * WARNING: Changing the order or type of members in this struct will
+ * invalidate existing EEPROM data!
  */
 
-#pragma once
+#ifndef SETTINGS_H
+#define SETTINGS_H
 
-#include <Arduino.h> // Required for uint8_t types
+#include <Arduino.h>
 
 struct RadioSettings {
-    int trim1;                // Trim value for Channel 1 (Roll/Steering)
-    int trim2;                // Trim value for Channel 2 (Pitch/Throttle)
-    int trim3;                // Trim value for Channel 3 (Yaw/Aux)
+    // --- Trim Configuration ---
+    // Range: 0 - 4095 (Center: 2048)
+    int trim1;                // Channel 1 (Roll/Aileron)
+    int trim2;                // Channel 2 (Pitch/Elevator)
+    int trim3;                // Channel 3 (Yaw/Rudder)
     
-    bool buzzerEnabled;       // Global buzzer toggle (Mute/Unmute)
-    bool lightModeEnabled;    // UI Theme: true = Light Mode, false = Dark Mode
+    // --- UI Preferences ---
+    bool buzzerEnabled;       // true = Sound On, false = Mute
+    bool lightModeEnabled;    // true = Light Background, false = Dark Background
     
-    bool channelInverted[8];  // Inversion status for channels 1-8 (true = inverted)
-    uint8_t timerProfile;     // Selected timer profile index
+    // --- Channel Logic ---
+    bool channelInverted[8];  // Inversion map for CH1-CH8 (true = Inverted)
+    uint8_t timerProfile;     // Saved index of the selected timer duration
 
-    bool airplaneMode; // false = Normal (Center 50%), true = Airplane (Center 0%)
+    // --- Flight Mode Configuration ---
+    // false = Normal/Quad Mode (Standard linear mapping)
+    // true  = Airplane Mode (Specific throttle curve/cutoff)
+    bool airplaneMode; 
 };
+
+#endif // SETTINGS_H
