@@ -2,7 +2,7 @@
  * @file DisplayManager.cpp
  * @author Ebrahim Siami
  * @brief OLED UI & Graphics Engine
- * @version 2.1.3
+ * @version 2.6.1
  * @date 2026-01-06
  * 
  * Manages all graphical user interface (GUI) elements including:
@@ -18,6 +18,7 @@
  * - Channel Inversion Menu.
  * - Dynamic Refresh Rate.
  * - Loop-decoupled Trim speed.
+ // just fuck this world, fuck everything
  */
 
 #include "DisplayManager.h"
