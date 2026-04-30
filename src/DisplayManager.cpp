@@ -2,8 +2,8 @@
  * @file DisplayManager.cpp
  * @author Ebrahim Siami
  * @brief OLED UI & Graphics Engine
- * @version 2.1.3
- * @date 2026-01-06
+ * @version 4.0.1
+ * @date 2026-04-23
  * 
  * Manages all graphical user interface (GUI) elements including:
  * - Boot splash screen animation
@@ -11,17 +11,13 @@
  * - Real-time telemetry display (Battery, Timer, Channels)
  * - Trim visualizers
  * - Advanced Settings Menus (Inversion, Modes)
- * 
- * NEW Features (Update 2.6.1):
- * 
- * - Smart Throttle (Airplane/Quad modes).
- * - Channel Inversion Menu.
- * - Dynamic Refresh Rate.
- * - Loop-decoupled Trim speed.
+ * - and much more that im lazy to write here for now
  */
 
 #include "DisplayManager.h"
 #include <Wire.h>
+#include "Buzzer.h"
+#include "Radio.h"
 
 // =============================================================================
 // --- Graphics Assets ---
@@ -50,6 +46,13 @@ const unsigned char epd_bitmap_mig_21 [] PROGMEM = {
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // =============================================================================
+// --- very strange externs! ---
+// =============================================================================
+extern bool simulatorMode;
+extern bool isDREditMode;
+extern uint8_t calibStep;
+
+// =============================================================================
 // --- Initialization & Helper Functions ---
 // =============================================================================
 
@@ -63,7 +66,7 @@ void setupDisplay() {
     display.setTextColor(SSD1306_WHITE);
     display.setTextSize(3);
 
-    const char* introText = "Ebr.co";
+    const char* introText = "EBR.co";
     int16_t x1, y1;
     uint16_t w, h;
     display.getTextBounds(introText, 0, 0, &x1, &y1, &w, &h);
@@ -96,7 +99,7 @@ void showSavingFeedback() {
     display.print(text);
     display.display();
 
-    beep(100);
+    playBeepEvent(EVT_CONFIRM);
     delay(300); // Allow time for EEPROM write cycle
 }
 
@@ -119,7 +122,7 @@ void showSplashScreen(const char* productName, const unsigned long durationMs) {
     display.setTextColor(SSD1306_WHITE);
     display.setTextSize(1);
     
-    const char* smallLogoText = "Ebr.co";
+    const char* smallLogoText = "EBR.co";
     int16_t x1, y1;
     uint16_t w, h;
     display.getTextBounds(smallLogoText, 0, 0, &x1, &y1, &w, &h);
@@ -181,16 +184,48 @@ void showSplashScreen(const char* productName, const unsigned long durationMs) {
 // --- Main Rendering Engine ---
 // =============================================================================
 
+static void drawNavFooter(int leftIndex, int rightIndex, int currentIndex) {
+    int y = 54;
+
+    // Left button
+    if (leftIndex >= 0) {
+        if (currentIndex == leftIndex) {
+            display.fillRect(0, y, 20, 8, SSD1306_WHITE);
+            display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+        } else {
+            display.setTextColor(SSD1306_WHITE);
+        }
+        display.setCursor(2, y);
+        display.print("<<");
+    }
+
+    // Right button
+    if (rightIndex >= 0) {
+        if (currentIndex == rightIndex) {
+            display.fillRect(SCREEN_WIDTH - 20, y, 20, 8, SSD1306_WHITE);
+            display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+        } else {
+            display.setTextColor(SSD1306_WHITE);
+        }
+        display.setCursor(SCREEN_WIDTH - 15, y);
+        display.print(">>");
+    }
+
+    display.setTextColor(SSD1306_WHITE); // reset
+}
+
 void drawCurrentPage(
     DisplayState currentPage,
     int trimsMenuIndex,
     int settingsMenuIndex,
+    int featuresMenuIndex,
     const RadioSettings& settings,
     byte throttle, byte pitch, byte roll, byte yaw,
     byte aux1, byte aux2, bool aux3, bool aux4,
     float voltage,
     int timerSelection, bool timerIsArmed, bool timerIsRunning, long timerValue, bool isTimeEditMode,
-    int invertMenuIndex
+    int invertMenuIndex, int drMenuIndex, int advChannelSelectIndex, int advConfigMenuIndex, 
+    int currentEditingChannel, bool isAdvEditMode, int expoMenuIndex, bool isExpoEditMode
 ) {
     display.clearDisplay();
     display.setTextSize(1);
@@ -210,14 +245,22 @@ void drawCurrentPage(
         case PAGE_MAIN3: {
             pageDisplayName = "System";
 
+            // ==========================================
+            // -- Y-Coordinates --
+            // ==========================================
+            int topY = 2; // battery
+            int row2Y = 22; // timer and D/R
+
+            // ==========================================
             // -- Battery Logic --
+            // ==========================================
             const float BATT_MAX_VOLTAGE = 8.4;
-            const float BATT_MIN_VOLTAGE = 6.0;
+            const float BATT_MIN_VOLTAGE = 7.2;
             long level = constrain(map(voltage * 100, (long)(BATT_MIN_VOLTAGE * 100), (long)(BATT_MAX_VOLTAGE * 100), 0, 100), 0, 100);
             
-            int battX = 5, battY = 5, battWidth = 28, battHeight = 12;
+            int battX = 5, battY = topY, battWidth = 28, battHeight = 12;
             display.drawRect(battX, battY, battWidth, battHeight, SSD1306_WHITE);
-            display.fillRect(battX + battWidth, battY + 3, 3, battHeight - 6, SSD1306_WHITE); // Battery Nipple
+            display.fillRect(battX + battWidth, battY + 3, 3, battHeight - 6, SSD1306_WHITE);
             
             int fillWidth = map(level, 0, 100, 0, battWidth - 2);
             if (fillWidth > 0) display.fillRect(battX + 1, battY + 1, fillWidth, battHeight - 2, SSD1306_WHITE);
@@ -227,61 +270,114 @@ void drawCurrentPage(
             display.print(voltage, 2);
             display.print("V");
 
-            // -- Timer Display Logic --
-            display.setCursor(5, 30);
-            display.print("TIMER: ");
+            // ==========================================
+            // -- Timer Logic & Text Formatting --
+            // ==========================================
             char timeText[10];
 
-            if (timerIsArmed || timerIsRunning) {
-                long remaining = timerValue;
-                if (remaining >= 0) {
-                    unsigned long minutes = (unsigned long)remaining / 60000;
-                    unsigned long seconds = ((unsigned long)remaining / 1000) % 60;
-                    sprintf(timeText, "%02lu:%02lu", minutes, seconds);
+            // 1- if the user is in timer edit mode
+            if (isTimeEditMode) {
+                if (timerSelection == -1) {
+                    sprintf(timeText, "--:--");
                 } else {
-                    // Count up if timer expired
-                    display.print("+");
-                    unsigned long passed = -remaining;
-                    unsigned long minutes = passed / 60000;
-                    unsigned long seconds = (passed / 1000) % 60;
-                    sprintf(timeText, "%02lu:%02lu", minutes, seconds);
+                    // nah you wrong this aint be ai coded, all Marya fault!
+                    sprintf(timeText, "%02d:00", timerSelection); 
                 }
-            } else {
-                if (timerSelection == 0) { sprintf(timeText, "--:--"); }
-                else { sprintf(timeText, "%02d:00", timerSelection); }
+            } 
+            // 2- if user is not in edit mode and timer is not armed
+            else if (timerSelection == -1) {
+                sprintf(timeText, "--:--");
+            } 
+            // 3- timer is activited or counting or waiting 
+            else {
+                if (timerIsArmed || timerIsRunning) {
+                    // my previus genius calculations,
+                    // fuck donald trump. fuck pedophiles. fuck israel
+                    long remaining = timerValue;
+                    if (remaining >= 0) {
+                        unsigned long minutes = (unsigned long)remaining / 60000;
+                        unsigned long seconds = ((unsigned long)remaining / 1000) % 60;
+                        sprintf(timeText, "%02lu:%02lu", minutes, seconds);
+                    } else {
+                        // Count up if timer expired
+                        unsigned long passed = -remaining;
+                        unsigned long minutes = passed / 60000;
+                        unsigned long seconds = (passed / 1000) % 60;
+                        sprintf(timeText, "+%02lu:%02lu", minutes, seconds); 
+                    }
+                } else {
+                    sprintf(timeText, "%02d:00", timerSelection);
+                }
             }
 
-            // Highlight Timer Selection
+            // ==========================================
+            // -- Timer Display (Left Side) --
+            // ==========================================
+            display.setCursor(5, row2Y);
+            
+            // Highlight ONLY the Timer text (Index 2)
             if (settingsMenuIndex == 2) {
-                display.fillRect(0, 28, SCREEN_WIDTH, 12, SSD1306_WHITE);
                 display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
             } else {
                 display.setTextColor(SSD1306_WHITE);
             }
 
-            display.setCursor(5, 30);
-            display.print("TIMER: ");
+            display.print("TIMER:");
 
             // Blink effect when editing
-            bool shouldShowText = true;
-            if (isTimeEditMode && (millis() % 1000 < 500)) {
-                shouldShowText = false;
+            bool shouldShowTime = true;
+            if (settingsMenuIndex == 2 && isTimeEditMode && (millis() % 1000 < 500)) {
+                shouldShowTime = false;
             }
 
-            if (shouldShowText) {
-                display.setCursor(5 + 40, 30);
+            if (shouldShowTime) {
                 display.print(timeText);
+            } else {
+                display.print("     "); // Print blank spaces so the highlight box doesn't vanish!
             }
+            display.setTextColor(SSD1306_WHITE); // Reset color
 
-            // -- Navigation Footer --
-            if (settingsMenuIndex == 0) {
-                display.fillRect(SCREEN_WIDTH - 20, navOptionsY, 20, 8, SSD1306_WHITE);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            // ==========================================
+            // -- D/R Toggle Display (Right Side) --
+            // ==========================================
+            display.setCursor(85, row2Y); 
+            
+            // Highlight if selected (Index 3)
+            if (settingsMenuIndex == 3) {
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); 
             } else {
                 display.setTextColor(SSD1306_WHITE);
             }
-            display.setCursor(SCREEN_WIDTH - 15, navOptionsY);
-            display.print(">>");
+
+            // Print ON or OFF
+            if (settings.dualRateEnabled) {
+                display.print("D/R:ON "); // Extra space for clearing pixels
+            } else {
+                display.print("D/R:OFF");
+            }
+            display.setTextColor(SSD1306_WHITE); // Reset text color
+
+            // ==========================================
+            // -- Radio Status Indicator --
+            // ==========================================
+            display.setCursor(77, topY + 2);
+            if (getRadioStatus()) {
+                display.print("TX:OK");
+            } else {
+                // Blink the error so the user notices!
+                if (millis() % 1000 < 500) {
+                    display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+                    display.print("!TX ERR!");
+                    display.setTextColor(SSD1306_WHITE);
+                } else {
+                    display.print("       ");
+                }
+            }
+
+            // ==========================================
+            // -- Navigation Footer --
+            // ==========================================
+            drawNavFooter(-1, 0, settingsMenuIndex);
             break;
         }
 
@@ -294,25 +390,7 @@ void drawCurrentPage(
             drawBar("ROL:", 0, 24, roll);
             drawBar("YAW:", 0, 36, yaw);
 
-            // Footer >
-            if (settingsMenuIndex == 0) {
-                display.fillRect(SCREEN_WIDTH - 20, navOptionsY, 20, 8, SSD1306_WHITE);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-            } else {
-                display.setTextColor(SSD1306_WHITE);
-            }
-            display.setCursor(SCREEN_WIDTH - 15, navOptionsY);
-            display.print(">>");
-
-            // Footer <
-            if (settingsMenuIndex == 1) {
-                display.fillRect(0, navOptionsY, 20, 8, SSD1306_WHITE);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-            } else {
-                display.setTextColor(SSD1306_WHITE);
-            }
-            display.setCursor(5, navOptionsY);
-            display.print("<<");
+            drawNavFooter(1, 0, settingsMenuIndex);
             
             pageDisplayName = "Channels 1-4";
             break;
@@ -327,25 +405,7 @@ void drawCurrentPage(
             drawBar("AUX3:", 0, 24, aux3 ? 255 : 0);
             drawBar("AUX4:", 0, 36, aux4 ? 255 : 0);
 
-            // Footer >
-            if (settingsMenuIndex == 0) {
-                display.fillRect(SCREEN_WIDTH - 20, navOptionsY, 20, 8, SSD1306_WHITE);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-            } else {
-                display.setTextColor(SSD1306_WHITE);
-            }
-            display.setCursor(SCREEN_WIDTH - 15, navOptionsY);
-            display.print(">>");
-
-            // Footer <
-            if (settingsMenuIndex == 1) {
-                display.fillRect(0, navOptionsY, 20, 8, SSD1306_WHITE);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-            } else {
-                display.setTextColor(SSD1306_WHITE);
-            }
-            display.setCursor(5, navOptionsY);
-            display.print("<<");
+            drawNavFooter(1, 0, settingsMenuIndex);
             
             pageDisplayName = "Channels 5-8";
             break;
@@ -408,23 +468,7 @@ void drawCurrentPage(
             display.print(resetText);
 
             // Footer Navigation
-            if (trimsMenuIndex == 1) {
-                display.fillRect(SCREEN_WIDTH - 20, navOptionsY, 20, 8, SSD1306_WHITE);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-            } else {
-                display.setTextColor(SSD1306_WHITE);
-            }
-            display.setCursor(SCREEN_WIDTH - 15, navOptionsY);
-            display.print(">>");
-
-            if (trimsMenuIndex == 2) {
-                display.fillRect(0, navOptionsY, 20, 8, SSD1306_WHITE);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-            } else {
-                display.setTextColor(SSD1306_WHITE);
-            }
-            display.setCursor(5, navOptionsY);
-            display.print("<<");
+            drawNavFooter(2, 1, trimsMenuIndex);
             
             pageDisplayName = "Trim Adjust";
             break;
@@ -437,7 +481,7 @@ void drawCurrentPage(
             pageDisplayName = "Settings";
             display.setTextSize(1);
 
-            for (int i = 0; i < SETTING_TOTAL - 1; i++) {
+            for (int i = 0; i < SETTING_TOTAL - 2; i++) {
                 int y = 8 * i + 4;
                 if (i == settingsMenuIndex) {
                     display.fillRect(0, y - 1, SCREEN_WIDTH, 9, SSD1306_WHITE);
@@ -465,15 +509,130 @@ void drawCurrentPage(
                 }
             }
 
-            // Back Button
-            if (settingsMenuIndex == SETTING_BACK) {
-                display.fillRect(0, navOptionsY, 20, 8, SSD1306_WHITE);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-            } else {
-                display.setTextColor(SSD1306_WHITE);
+            // Footer Navigation
+            drawNavFooter(SETTING_BACK, SETTING_NEXT, settingsMenuIndex);
+
+            break;
+        }
+
+        // ---------------------------------------------------------------------
+        // --- PAGE: FEATURES MENU ---
+        // ---------------------------------------------------------------------
+        case PAGE_FEATURES: {
+            pageDisplayName = "Features";
+            display.setTextSize(1);
+
+            for (int i = 0; i < FEATURE_BACK; i++) {
+                int y = 8 * i + 4;
+                if (i == featuresMenuIndex) {
+                    display.fillRect(0, y - 1, SCREEN_WIDTH, 9, SSD1306_WHITE);
+                    display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+                } else {
+                    display.setTextColor(SSD1306_WHITE);
+                }
+
+                display.setCursor(5, y);
+                switch(i) {
+                    case FEATURE_EXPO:              display.print("Expo >"); break;
+                    case FEATURE_DUAL_RATE:         display.print("Dual Rate >"); break;
+                    case FEATURE_CHANNEL_ADVANCED:  display.print("Channel Advanced >"); break;
+                    case FEATURE_CALIBRATION:       display.print("Calibration >"); break;
+                    case FEATURE_CHANNELS_MIX: {
+                        display.print("Channels Mix: ");
+                        const char* mixNames[] = {"Normal", "VTL A", "VTL B", "DLT A", "DLT B"};
+                        if (settings.mixMode >= 0 && settings.mixMode <= 4) {
+                            display.print(mixNames[settings.mixMode]);
+                        } else {     
+                            display.print("Unknown");
+                        }
+                        break; // damnit i forgot to add a {} here haha, jews fault!
+                }
+                    case FEATURE_SIMULATOR:
+                        display.print("Simulator Mode: ");
+                        display.print(simulatorMode ? "On" : "Off");
+                }
             }
-            display.setCursor(5, navOptionsY);
-            display.print("<<");
+
+            // Back Button
+            drawNavFooter(FEATURE_BACK, -1, featuresMenuIndex);
+            break;
+        }
+
+        // ---------------------------------------------------------------------
+        // --- PAGE: DUAL RATE ---
+        // ---------------------------------------------------------------------
+        case PAGE_DUAL_RATE: {
+            display.setTextSize(1);
+
+            auto drawDRBar = [](int y, int percent) {
+                int barWidth = map(constrain(percent, 0, 100), 0, 100, 0, 40);
+                display.drawRect(80, y, 42, 7, SSD1306_WHITE);
+                display.fillRect(81, y + 1, barWidth, 5, SSD1306_WHITE);
+            };
+
+            // --- ROLL (Index 2) ---
+            if (drMenuIndex == 2) {
+                display.fillRoundRect(2, 4, 70, 11, 2, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            } else { display.setTextColor(SSD1306_WHITE); }
+            
+            display.setCursor(6, 6);
+            display.print("Roll: ");
+            if (!(drMenuIndex == 2 && isDREditMode && (millis() % 1000 < 500))) {
+                display.setCursor(45, 6);
+                if(settings.dualRateRoll < 100) display.print(" ");
+                display.print(settings.dualRateRoll); display.print("%");
+            }
+            drawDRBar(6, settings.dualRateRoll);
+
+            // --- PITCH (Index 3) ---
+            if (drMenuIndex == 3) {
+                display.fillRoundRect(2, 16, 70, 11, 2, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            } else { display.setTextColor(SSD1306_WHITE); }
+            
+            display.setCursor(6, 18);
+            display.print("Pitch:");
+            if (!(drMenuIndex == 3 && isDREditMode && (millis() % 1000 < 500))) {
+                display.setCursor(45, 18);
+                if(settings.dualRatePitch < 100) display.print(" ");
+                display.print(settings.dualRatePitch); display.print("%");
+            }
+            drawDRBar(18, settings.dualRatePitch);
+
+            // --- YAW (Index 4) ---
+            if (drMenuIndex == 4) {
+                display.fillRoundRect(2, 28, 70, 11, 2, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            } else { display.setTextColor(SSD1306_WHITE); }
+            
+            display.setCursor(6, 30);
+            display.print("Yaw:  ");
+            if (!(drMenuIndex == 4 && isDREditMode && (millis() % 1000 < 500))) {
+                display.setCursor(45, 30);
+                if(settings.dualRateYaw < 100) display.print(" ");
+                display.print(settings.dualRateYaw); display.print("%");
+            }
+            drawDRBar(30, settings.dualRateYaw);
+
+            display.drawFastHLine(0, 43, SCREEN_WIDTH, SSD1306_WHITE);
+
+            // --- SAVE & BACK BUTTONS ---
+            display.setTextColor(SSD1306_WHITE);
+            
+            if (drMenuIndex == 0) {
+                display.fillRoundRect(4, 48, 50, 13, 3, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            } else { display.drawRoundRect(4, 48, 50, 13, 3, SSD1306_WHITE); }
+            display.setCursor(12, 51); display.print("BACK");
+            
+            display.setTextColor(SSD1306_WHITE);
+            if (drMenuIndex == 5) {
+                display.fillRoundRect(64, 48, 60, 13, 3, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            } else { display.drawRoundRect(64, 48, 60, 13, 3, SSD1306_WHITE); }
+            display.setCursor(82, 51); display.print("SAVE");
+
             break;
         }
 
@@ -481,13 +640,28 @@ void drawCurrentPage(
         // --- PAGE: INFO / CREDITS ---
         // ---------------------------------------------------------------------
         case PAGE_INFO: {
-            pageDisplayName = "Info";
-            display.setCursor(0, 5);
-            display.println("EBR.co EB_I8L RC");
-            display.println("Version 2.6.1");
-            display.println("By Ebrahim and Marya:)");
-            display.println();
-            display.println("Press Enter to go back.");
+            display.setTextSize(1);
+
+            display.drawRoundRect(0, 0, 128, 64, 5, SSD1306_WHITE);
+            
+            display.fillRoundRect(10, 4, 108, 13, 2, SSD1306_WHITE);
+            display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            display.setCursor(20, 7);
+            display.println("EBR.co E_I8L RC");
+            
+            display.setTextColor(SSD1306_WHITE);
+            
+            display.setCursor(17, 22);
+            display.println("Firmware: V2.6.1");
+            
+            display.setCursor(11, 34);
+            display.println("Tel: +989158913955");
+            display.println("Tel: +3--141592653");
+            
+            display.drawLine(10, 46, 118, 46, SSD1306_WHITE);
+            
+            display.setCursor(11, 51);
+            display.println("[ENTER] to go back");
             break;
         }
 
@@ -495,47 +669,315 @@ void drawCurrentPage(
         // --- PAGE: CHANNEL INVERSION ---
         // ---------------------------------------------------------------------
         case PAGE_CH_INVERT: {
-            pageDisplayName = "Invert Channels";
             display.setTextSize(1);
 
             // Two-column layout: Left (CH1-4), Right (CH5-8)
             for (int i = 0; i < 8; i++) {
-                int x = (i < 4) ? 0 : 64;
-                int y = (i % 4) * 10 + 4;
+                int x = (i < 4) ? 2 : 66;
+                int y = (i % 4) * 11 + 2;
 
                 if (i == invertMenuIndex) {
-                    display.fillRect(x, y - 1, 60, 9, SSD1306_WHITE);
+                    display.fillRoundRect(x, y, 60, 10, 2, SSD1306_WHITE);
                     display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
                 } else {
+                    display.drawRoundRect(x, y, 60, 10, 2, SSD1306_WHITE);
                     display.setTextColor(SSD1306_WHITE);
                 }
 
-                display.setCursor(x + 2, y);
+                display.setCursor(x + 4, y + 1);
                 display.print("CH");
                 display.print(i + 1);
                 display.print(":");
+                
+                display.setCursor(x + 36, y + 1);
                 display.print(settings.channelInverted[i] ? "INV" : "NRM");
             }
 
-            // Back Button
-            int backY = 44;
+            // Back Button at the bottom
+            int backY = 48;
             if (invertMenuIndex == 8) {
-                display.fillRect(0, backY, SCREEN_WIDTH, 9, SSD1306_WHITE);
+                display.fillRoundRect(34, backY, 60, 11, 3, SSD1306_WHITE);
                 display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
             } else {
+                display.drawRoundRect(34, backY, 60, 11, 3, SSD1306_WHITE);
                 display.setTextColor(SSD1306_WHITE);
             }
-            display.setCursor(5, backY + 1);
+            display.setCursor(44, backY + 2);
             display.print("<< BACK");
 
             break;
         }
 
+        // ---------------------------------------------------------------------
+        // --- PAGE: CALIBRATION ---
+        // ---------------------------------------------------------------------
         case PAGE_CALIBRATION: {
-            pageDisplayName = "Calibration";
-            display.setCursor(10, 20);
-            display.setTextSize(2);
-            display.print("Coming Soon!");
+            display.setTextSize(1);
+
+            display.drawRoundRect(0, 0, 128, 13, 2, SSD1306_WHITE);
+            display.setCursor(4, 3);
+            display.print("Status: ");
+            if (calibStep == 0) display.print("READY");
+            else if (calibStep == 3) display.print("FINISHED");
+            else { display.print("STEP "); display.print(calibStep); display.print("/2"); }
+
+            display.drawRoundRect(0, 16, 128, 48, 3, SSD1306_WHITE);
+
+            if (calibStep == 0) {
+                display.setCursor(25, 24);
+                display.print("PRESS [ENTER]");
+                display.setCursor(13, 34);
+                display.print("Begin Calibration");
+                
+                display.fillRoundRect(4, 49, 120, 12, 2, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK);
+                display.setCursor(10, 51);
+                display.print("UP/DOWN: Exit Menu");
+                display.setTextColor(SSD1306_WHITE);
+            }
+            else if (calibStep == 1) {
+                display.setCursor(5, 25);
+                display.print("1.Center all sticks");
+                display.setCursor(5, 38);
+                display.print("2.Press [OK]");
+                display.setCursor(32, 52);
+                display.print("Calibration");
+            } 
+            else if (calibStep == 2) {
+                display.setCursor(10, 20);
+                display.print("Move all sticks to");
+                display.setCursor(10, 30);
+                display.print("MAX/MIN extremes");
+                display.setCursor(20, 40);
+                display.print("Then press [OK]");
+                display.setCursor(32, 52);
+                display.print("Calibration");
+            } 
+            else if (calibStep == 3) {
+                display.setCursor(30, 25);
+                display.print("CALIB SAVED!");
+                display.fillRoundRect(15, 38, 98, 12, 2, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK);
+                display.setCursor(17, 40);
+                display.print("Press OK to Exit");
+                display.setTextColor(SSD1306_WHITE);
+                display.setCursor(32, 52);
+                display.print("Calibration");
+            }
+            break;
+        }
+
+        // ---------------------------------------------------------------------
+        // --- PAGE: ADVANCED CHANNELS SELECT ---
+        // ---------------------------------------------------------------------
+        case PAGE_CHANNELS_ADVANCED: {
+            pageDisplayName = "Adv. Channels";
+            display.setTextSize(1);
+
+            const char* channelNames[] = {"1. Roll", "2. Pitch", "3. Throttle", "4. Yaw"};
+
+            for (int i = 0; i < 4; i++) {
+                int y = 8 * i + 4;
+                if (i == advChannelSelectIndex) {
+                    display.fillRoundRect(0, y - 1, SCREEN_WIDTH, 9, 2, SSD1306_WHITE);
+                    display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+                } else {
+                    display.setTextColor(SSD1306_WHITE);
+                }
+                display.setCursor(5, y);
+                display.print(channelNames[i]);
+            }
+
+            display.drawFastHLine(0, 40, SCREEN_WIDTH, SSD1306_WHITE);
+
+            int backY = 44;
+            if (advChannelSelectIndex == 4) {
+                display.fillRoundRect(0, backY, SCREEN_WIDTH, 10, 2, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            } else {
+                display.setTextColor(SSD1306_WHITE);
+                display.drawRoundRect(0, backY, SCREEN_WIDTH, 10, 2, SSD1306_WHITE);
+            }
+            display.setCursor(SCREEN_WIDTH/2 - 15, backY + 1);
+            display.print("BACK");
+            display.setTextColor(SSD1306_WHITE); // ah i missed this thing here.
+            // fuck zionists and jews forever
+            break;
+        }
+
+        // ---------------------------------------------------------------------
+        // --- PAGE: CHANNEL CONFIG (EPA & SUBTRIM) ---
+        // ---------------------------------------------------------------------
+        case PAGE_CHANNEL_CONFIG: {
+            const char* chNames[] = {"Roll", "Pitch", "Throttle", "Yaw"};
+            pageDisplayName = chNames[currentEditingChannel];
+            display.setTextSize(1);
+
+            auto drawBar = [&](int y, int value) {
+                int barWidth = 40;
+                int barX = 85;
+                display.drawRect(barX, y, barWidth, 7, SSD1306_WHITE);
+                int fill = map(value, 0, 4095, 0, barWidth - 2);
+                fill = constrain(fill, 0, barWidth - 2);
+                display.fillRect(barX + 1, y + 1, fill, 5, SSD1306_WHITE);
+            };
+
+            // --- MIN (EPA) - Index 1 ---
+            display.setCursor(2, 6);
+            if (advConfigMenuIndex == 1) display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            else display.setTextColor(SSD1306_WHITE);
+            display.print(" MIN: ");
+            display.setTextColor(SSD1306_WHITE);
+            
+            if (!(advConfigMenuIndex == 1 && isAdvEditMode && (millis() % 1000 < 500))) {
+                display.setCursor(40, 6);
+                float minPct = (settings.epaMin[currentEditingChannel] / 4095.0) * 100.0;
+                display.print(minPct, 1);
+                display.print("%");
+            }
+            drawBar(5, settings.epaMin[currentEditingChannel]);
+
+            // --- CENTER (SUBTRIM) - Index 2 ---
+            display.setCursor(2, 18);
+            if (advConfigMenuIndex == 2) display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            else display.setTextColor(SSD1306_WHITE);
+            display.print(" MID: ");
+            display.setTextColor(SSD1306_WHITE);
+            
+            if (!(advConfigMenuIndex == 2 && isAdvEditMode && (millis() % 1000 < 500))) {
+                display.setCursor(40, 18);
+                float midPct = (settings.subTrim[currentEditingChannel] / 4095.0) * 100.0;
+                display.print(midPct, 1);
+                display.print("%");
+            }
+            drawBar(17, settings.subTrim[currentEditingChannel]);
+
+            // --- MAX (EPA) - Index 3 ---
+            display.setCursor(2, 30);
+            if (advConfigMenuIndex == 3) display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            else display.setTextColor(SSD1306_WHITE);
+            display.print(" MAX: ");
+            display.setTextColor(SSD1306_WHITE);
+            
+            if (!(advConfigMenuIndex == 3 && isAdvEditMode && (millis() % 1000 < 500))) {
+                display.setCursor(40, 30);
+                float maxPct = (settings.epaMax[currentEditingChannel] / 4095.0) * 100.0;
+                display.print(maxPct, 1);
+                display.print("%");
+            }
+            drawBar(29, settings.epaMax[currentEditingChannel]);
+
+            // --- SEPARATE SAVE & BACK BUTTONS ---
+            int btnY = 41;
+            
+            if (advConfigMenuIndex == 4) {
+                display.fillRoundRect(5, btnY, 55, 11, 2, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            } else {
+                display.drawRoundRect(5, btnY, 55, 11, 2, SSD1306_WHITE);
+                display.setTextColor(SSD1306_WHITE);
+            }
+            display.setCursor(20, btnY + 2);
+            display.print("SAVE");
+
+            if (advConfigMenuIndex == 0) {
+                display.fillRoundRect(68, btnY, 55, 11, 2, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            } else {
+                display.drawRoundRect(68, btnY, 55, 11, 2, SSD1306_WHITE);
+                display.setTextColor(SSD1306_WHITE);
+            }
+            display.setCursor(83, btnY + 2);
+            display.print("BACK");
+
+            break;
+        }
+
+        // ---------------------------------------------------------------------
+        // --- PAGE: EXPO ---
+        // ---------------------------------------------------------------------
+        case PAGE_EXPO: {
+            display.setTextSize(1);
+            int xPos;
+
+            auto drawExpoBar = [](int y, uint8_t channelValue) {
+                int barWidth = map(channelValue, 0, 255, 0, 40);
+                display.drawRect(80, y, 42, 7, SSD1306_WHITE);
+                display.fillRect(81, y + 1, barWidth, 5, SSD1306_WHITE);
+            };
+
+            // --- ROLL (Index 1) ---
+            if (expoMenuIndex == 1) {
+                display.fillRoundRect(2, 4, 70, 11, 2, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            } else { display.setTextColor(SSD1306_WHITE); }
+
+            display.setCursor(6, 6);
+            display.print("Roll:");
+
+            if (!(expoMenuIndex == 1 && isExpoEditMode && (millis() % 1000 < 500))) {
+                String valStr = String(settings.expoRoll) + "%";
+                int strWidth = valStr.length() * 6;
+                display.setCursor(68 - strWidth, 6); 
+                display.print(valStr);
+            }
+            drawExpoBar(6, roll);
+
+            // --- PITCH (Index 2) ---
+            if (expoMenuIndex == 2) {
+                display.fillRoundRect(2, 16, 70, 11, 2, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            } else { display.setTextColor(SSD1306_WHITE); }
+
+            display.setCursor(6, 18);
+            display.print("Pitch:");
+
+            if (!(expoMenuIndex == 2 && isExpoEditMode && (millis() % 1000 < 500))) {
+                String valStr = String(settings.expoPitch) + "%";
+                int strWidth = valStr.length() * 6;
+                display.setCursor(68 - strWidth, 18); 
+                display.print(valStr);
+            }
+            drawExpoBar(18, pitch);
+
+            // --- YAW (Index 3) ---
+            if (expoMenuIndex == 3) {
+                display.fillRoundRect(2, 28, 70, 11, 2, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            } else { display.setTextColor(SSD1306_WHITE); }
+
+            display.setCursor(6, 30);
+            display.print("Yaw:");
+
+            if (!(expoMenuIndex == 3 && isExpoEditMode && (millis() % 1000 < 500))) {
+                String valStr = String(settings.expoYaw) + "%";
+                int strWidth = valStr.length() * 6;
+                display.setCursor(68 - strWidth, 30); 
+                display.print(valStr);
+            }
+            drawExpoBar(30, yaw);
+
+            display.drawFastHLine(0, 43, SCREEN_WIDTH, SSD1306_WHITE);
+
+            // --- SAVE & BACK BUTTONS ---
+            display.setTextColor(SSD1306_WHITE);
+            
+            // BACK botton (Index 0)
+            if (expoMenuIndex == 0) {
+                display.fillRoundRect(4, 48, 50, 13, 3, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            } else { display.drawRoundRect(4, 48, 50, 13, 3, SSD1306_WHITE); }
+            display.setCursor(12, 51); display.print("BACK");
+            
+            display.setTextColor(SSD1306_WHITE);
+
+            // SAVE botton (Index 4)
+            if (expoMenuIndex == 4) {
+                display.fillRoundRect(64, 48, 60, 13, 3, SSD1306_WHITE);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+            } else { display.drawRoundRect(64, 48, 60, 13, 3, SSD1306_WHITE); }
+            display.setCursor(82, 51); display.print("SAVE");
+
             break;
         }
     }
@@ -548,4 +990,4 @@ void drawCurrentPage(
     display.print(pageDisplayName);
 
     display.display();
-}
+}   

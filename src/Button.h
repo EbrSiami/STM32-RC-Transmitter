@@ -2,13 +2,8 @@
  * @file Button.h
  * @author Ebrahim Siami
  * @brief Button Class Interface
- * @version 2.1.3
- * @date 2025-02-06
- *
- * Description:
- * Defines the structure for handling physical buttons with 
- * internal pull-up resistors (Active-Low configuration) 
- * and non-blocking software debouncing.
+ * @version 4.0.1
+ * @date 2026-04-08
  */
 
 #ifndef BUTTON_H
@@ -52,6 +47,14 @@ public:
      * @return true while the button is physically held down.
      */
     bool isBeingHeld();
+    
+    /**
+     * @brief Checks if the button is held down, repeating the action.
+     * @param startDelayMs Wait time before repeating starts (default 500ms).
+     * @param repeatDelayMs Speed of the repeat ticks (default 150ms).
+     * @return true on every repeat tick.
+     */
+    bool isAutoRepeating(unsigned long startDelayMs = 500, unsigned long repeatDelayMs = 150);
 
 private:
     int _pin;                       // Hardware pin number
@@ -62,6 +65,10 @@ private:
     bool _wasJustPressedFlag;       // Event flag for single click detection
     
     unsigned long _lastDebounceTime; // Timestamp of the last state change
+
+    unsigned long _pressStartTime;   // When the button was first pressed
+    unsigned long _lastRepeatTime;   // Time of the last auto-repeat tick
+    bool _handledAsHold;             // Prevents release-click if it was held
 };
 
 #endif // BUTTON_H
