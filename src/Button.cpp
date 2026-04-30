@@ -2,14 +2,8 @@
  * @file Button.cpp
  * @author Ebrahim Siami
  * @brief Non-blocking Switch Debouncing Implementation
- * @version 2.1.3
- * @date 2025-02-05
- *
- * Description:
- * Handles push-button logic with software debouncing.
- * - Configured for Active-Low wiring (Input Pull-up).
- * - Detects state changes and filters out noise based on `debounceDelay`.
- * - Triggers 'wasJustPressed' events upon button RELEASE (to prevent accidental double-clicks).
+ * @version 4.0.1
+ * @date 2026-04-08
  */
 
 #include "Button.h"
@@ -27,7 +21,10 @@ Button::Button(int pin, long debounceDelay)
       _lastPhysicalState(HIGH),
       _buttonIsCurrentlyPressed(false),
       _wasJustPressedFlag(false),
-      _lastDebounceTime(0) {
+      _lastDebounceTime(0),
+      _pressStartTime(0),
+      _lastRepeatTime(0),
+      _handledAsHold(false) {
 }
 
 /**
@@ -58,16 +55,21 @@ void Button::update() {
         
         // Logic for Active-Low (Low = Pressed, High = Released)
         
-        // Case A: Button was just pressed down firmly
+        // Case A: Button pressed
         if (reading == LOW && !_buttonIsCurrentlyPressed) {
             _buttonIsCurrentlyPressed = true;
+            _pressStartTime = currentTime; // Record start time
+            _lastRepeatTime = currentTime; 
+            _handledAsHold = false;        // Reset hold flag
         }
         
-        // Case B: Button was just released
-        // We register the "Click" event here (on release)
+        // Case B: Button released
         else if (reading == HIGH && _buttonIsCurrentlyPressed) {
             _buttonIsCurrentlyPressed = false;
-            _wasJustPressedFlag = true; 
+            // Only trigger click IF it wasn't held down for Auto-Repeat
+            if (!_handledAsHold) {
+                _wasJustPressedFlag = true; 
+            }
         }
     }
 }
@@ -95,4 +97,20 @@ bool Button::wasJustPressed() {
  */
 bool Button::isBeingHeld() {
     return _buttonIsCurrentlyPressed;
+}
+
+bool Button::isAutoRepeating(unsigned long startDelayMs, unsigned long repeatDelayMs) {
+    if (_buttonIsCurrentlyPressed) {
+        unsigned long currentTime = millis();
+        // Has it been held long enough to start repeating?
+        if ((currentTime - _pressStartTime) >= startDelayMs) {
+            // Is it time for the next tick?
+            if ((currentTime - _lastRepeatTime) >= repeatDelayMs) {
+            _lastRepeatTime = currentTime;
+                _handledAsHold = true; // Mark as held (cancels the release click!)
+                return true;
+            }
+        }
+    }
+    return false;
 }

@@ -2,17 +2,12 @@
  * @file DisplayManager.h
  * @author Ebrahim Siami
  * @brief Interface for OLED Display Management
- * @version 2.6.1
- * @date 2026-01-06
+ * @version 4.0.1
+ * @date 2026-04-23
  *
  * Description:
  * Defines display states, menu items, and rendering prototypes.
  * acts as the bridge between the main logic and the visual output.
- *
- * NEW Features (Update 2.6.1):
- * - Smart Throttle (Airplane/Quad modes).
- * - Channel Inversion Menu.
- * - Dynamic Refresh Rate support.
  */
 
 #ifndef DISPLAY_MANAGER_H
@@ -43,9 +38,14 @@ enum DisplayState {
     PAGE_MAIN3,       // Dashboard: Timer, Battery, System Status
     PAGE_TRIMS,       // Visual Trim Adjustment Page
     MENU,             // General Settings Menu
+    PAGE_FEATURES,
     PAGE_INFO,        // About / Credits Screen
     PAGE_CALIBRATION, // Stick Calibration (Placeholder/WIP)
-    PAGE_CH_INVERT    // Dedicated Channel Inversion Menu
+    PAGE_CH_INVERT,    // Dedicated Channel Inversion Menu
+    PAGE_DUAL_RATE,
+    PAGE_CHANNELS_ADVANCED,
+    PAGE_CHANNEL_CONFIG,
+    PAGE_EXPO
 };
 
 /**
@@ -60,7 +60,19 @@ enum SettingsMenu {
     SETTING_THROTTLE_MODE, // Switches between Airplane (0-100) and Quad (Center-based)
     SETTING_INFO,
     SETTING_BACK,          // Navigation Back Button
+    SETTING_NEXT,
     SETTING_TOTAL          // Sentinel value for loop limits
+};
+
+enum FeaturesMenu {
+    FEATURE_EXPO,
+    FEATURE_DUAL_RATE,
+    FEATURE_CHANNEL_ADVANCED,
+    FEATURE_CALIBRATION,
+    FEATURE_CHANNELS_MIX,
+    FEATURE_SIMULATOR,
+    FEATURE_BACK,
+    FEATURE_TOTAL
 };
 
 // =============================================================================
@@ -121,12 +133,25 @@ void drawCurrentPage(
     DisplayState currentPage,
     int trimsMenuIndex,
     int settingsMenuIndex,
+    int featuresMenuIndex,
     const RadioSettings& settings,
     byte throttle, byte pitch, byte roll, byte yaw,
     byte aux1, byte aux2, bool aux3, bool aux4,
     float voltage,
-    int timerSelection, bool timerIsArmed, bool timerIsRunning, long timerValue, bool isTimeEditMode,
-    int invertMenuIndex 
+    int timerSelection,
+    bool timerIsArmed,
+    bool timerIsRunning,
+    long timerValue,
+    bool isTimeEditMode,
+    int invertMenuIndex,
+    int drMenuIndex,
+    int advChannelSelectIndex,
+    int advConfigMenuIndex,
+    int currentEditingChannel,
+    bool isAdvEditMode,
+    int expoMenuIndex,
+    bool isExpoEditMode 
+
 );
 
 #endif // DISPLAY_MANAGER_H

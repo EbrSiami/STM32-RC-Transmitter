@@ -2,8 +2,8 @@
  * @file Radio.h
  * @author Ebrahim Siami
  * @brief NRF24L01+ Communication Driver
- * @version 2.1.3
- * @date 2026-01-07
+ * @version 4.0.1
+ * @date 2025-04-24
  * 
  * Defines the NRF24L01+ configuration pins and the data packet structure
  * used for communication between the transmitter and receiver.
@@ -25,7 +25,6 @@
 /**
  * @brief Control Data Packet Structure
  * CRITICAL: This structure must match EXACTLY on the Receiver side.
- * Total Size: 14 bytes (6 ints + 2 bools + padding/alignment)
  */
 typedef struct {
   uint8_t throttle;
@@ -43,6 +42,8 @@ extern RF24 radio;
 
 // --- Function Prototypes ---
 
+bool getRadioStatus(); 
+
 /**
  * @brief Initializes the radio hardware and settings.
  */
@@ -53,5 +54,10 @@ void setupRadio();
  * @param dataToSend The populated data structure.
  */
 void sendRadioData(data_t dataToSend);
+
+/**
+ * @brief use it to turn off the radio (like simulator mode)
+ **/
+void setRadioPower(bool enable);
 
 #endif // RADIO_H

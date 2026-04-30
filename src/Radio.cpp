@@ -2,8 +2,8 @@
  * @file Radio.cpp
  * @author Ebrahim Siami
  * @brief NRF24L01+ Communication Driver
- * @version 2.1.3
- * @date 2025-02-01
+ * @version 4.0.1
+ * @date 2025-04-23
  *
  * Description:
  * Handles initialization and data transmission using the RF24 library.
@@ -16,6 +16,8 @@
 // =============================================================================
 // --- Configuration & Globals ---
 // =============================================================================
+
+bool radioIsOK = false;
 
 // Initialize RF24 Object (CE Pin, CSN Pin defined in Radio.h)
 RF24 radio(RF_CE_PIN, RF_CSN_PIN);
@@ -40,9 +42,10 @@ const uint64_t pipeOut = 0xE8E8F0F0E1LL;
 void setupRadio() {
     SPI.begin();
 
-    if (!radio.begin()) {
-        // TODO: Handle hardware failure (e.g., Show "Radio Error" on OLED)
-        // For now, execution continues, but transmission will fail silently.
+    if (radio.begin()) {
+        radioIsOK = true; // Chip is alive!
+    } else {
+        radioIsOK = false; // Chip is dead or disconnected!
     }
 
     radio.openWritingPipe(pipeOut);
@@ -60,4 +63,18 @@ void setupRadio() {
  */
 void sendRadioData(data_t dataToSend) {
     radio.write(&dataToSend, sizeof(data_t));
+}
+
+bool getRadioStatus() {
+    return radioIsOK;
+}
+
+void setRadioPower(bool enable) {
+    if (enable) {
+        radio.powerUp(); 
+        delay(500);
+        radio.stopListening();
+    } else {
+        radio.powerDown();
+    }
 }
