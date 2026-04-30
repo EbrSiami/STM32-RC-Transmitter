@@ -3,7 +3,7 @@
  * @author Ebrahim Siami
  * @brief NRF24L01+ Communication Driver
  * @version 4.0.1
- * @date 2025-04-24
+ * @date 2026-04-24
  * 
  * Defines the NRF24L01+ configuration pins and the data packet structure
  * used for communication between the transmitter and receiver.
