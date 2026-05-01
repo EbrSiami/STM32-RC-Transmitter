@@ -655,7 +655,6 @@ void drawCurrentPage(
             display.println("Firmware: V2.6.1");
             
             display.setCursor(11, 34);
-            display.println("Tel: +989158913955");
             display.println("Tel: +3--141592653");
             
             display.drawLine(10, 46, 118, 46, SSD1306_WHITE);
