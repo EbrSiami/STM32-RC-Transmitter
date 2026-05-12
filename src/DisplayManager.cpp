@@ -103,12 +103,15 @@ void showSavingFeedback() {
     delay(300); // Allow time for EEPROM write cycle
 }
 
-void drawBar(const char* label, int x, int y, byte value) {
+void drawBar(const char* label, int x, int y, uint16_t value, uint16_t maxValue) {
     display.setCursor(x, y);
     display.print(label);
     
     int barWidth = 80;
-    int filled = map(value, 0, 255, 0, barWidth);
+    // i hate this map function
+    // int filled = map(value, 0, maxValue, 0, barWidth);
+    // int filled = map((long)value, 0L, (long)maxValue, 0L, (long)barWidth);
+    int filled = (int)((uint32_t)value * barWidth / maxValue);  // hope this one works 
     
     display.drawRect(x + 30, y, barWidth, 8, SSD1306_WHITE);
     display.fillRect(x + 30, y, filled, 8, SSD1306_WHITE);
@@ -220,7 +223,7 @@ void drawCurrentPage(
     int settingsMenuIndex,
     int featuresMenuIndex,
     const RadioSettings& settings,
-    byte throttle, byte pitch, byte roll, byte yaw,
+    uint16_t throttle, uint16_t pitch, uint16_t roll, uint16_t yaw,
     byte aux1, byte aux2, bool aux3, bool aux4,
     float voltage,
     int timerSelection, bool timerIsArmed, bool timerIsRunning, long timerValue, bool isTimeEditMode,
@@ -385,10 +388,10 @@ void drawCurrentPage(
         // --- PAGE: CHANNELS 1-4 (Main1) ---
         // ---------------------------------------------------------------------
         case PAGE_MAIN1: {
-            drawBar("THT:", 0, 0, throttle);
-            drawBar("PIT:", 0, 12, pitch);
-            drawBar("ROL:", 0, 24, roll);
-            drawBar("YAW:", 0, 36, yaw);
+            drawBar("THT:", 0, 0, throttle, 2047);
+            drawBar("PIT:", 0, 12, pitch, 2047);
+            drawBar("ROL:", 0, 24, roll, 2047);
+            drawBar("YAW:", 0, 36, yaw, 2047);
 
             drawNavFooter(1, 0, settingsMenuIndex);
             
@@ -400,10 +403,10 @@ void drawCurrentPage(
         // --- PAGE: CHANNELS 5-8 (Main2) ---
         // ---------------------------------------------------------------------
         case PAGE_MAIN2: {
-            drawBar("AUX1:", 0, 0, aux1);
-            drawBar("AUX2:", 0, 12, aux2);
-            drawBar("AUX3:", 0, 24, aux3 ? 255 : 0);
-            drawBar("AUX4:", 0, 36, aux4 ? 255 : 0);
+            drawBar("AUX1:", 0, 0, aux1, 255);
+            drawBar("AUX2:", 0, 12, aux2, 255);
+            drawBar("AUX3:", 0, 24, aux3 ? 1 : 0, 1);
+            drawBar("AUX4:", 0, 36, aux4 ? 1 : 0, 1);
 
             drawNavFooter(1, 0, settingsMenuIndex);
             

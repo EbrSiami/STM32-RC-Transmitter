@@ -135,7 +135,7 @@ void drawCurrentPage(
     int settingsMenuIndex,
     int featuresMenuIndex,
     const RadioSettings& settings,
-    byte throttle, byte pitch, byte roll, byte yaw,
+    uint16_t throttle, uint16_t pitch, uint16_t roll, uint16_t yaw,
     byte aux1, byte aux2, bool aux3, bool aux4,
     float voltage,
     int timerSelection,

@@ -26,16 +26,18 @@
  * @brief Control Data Packet Structure
  * CRITICAL: This structure must match EXACTLY on the Receiver side.
  */
+#pragma pack(push, 1)
 typedef struct {
-  uint8_t throttle;
-  uint8_t pitch;
-  uint8_t roll;
-  uint8_t yaw;
-  uint8_t aux1;    // Potentiometer / Switch
-  uint8_t aux2;    // Potentiometer / Switch
-  uint8_t aux3;   // Digital Switch A
-  uint8_t aux4;   // Digital Switch B
+    uint16_t roll     : 11;
+    uint16_t pitch    : 11;
+    uint16_t throttle : 11;
+    uint16_t yaw      : 11;
+    uint8_t  aux1     : 8;
+    uint8_t  aux2     : 8;
+    uint8_t  aux3     : 1;
+    uint8_t  aux4     : 1;
 } data_t;
+#pragma pack(pop)
 
 // Global Radio Object (Defined in Radio.cpp)
 extern RF24 radio;

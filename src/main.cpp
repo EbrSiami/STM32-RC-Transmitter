@@ -1142,10 +1142,11 @@ void loop() {
         // if fucking jews allows me, fuck israel fuck trump fuck epstein
         // fuck everything in this fucking world
 
-        data.roll     = final_roll_12b >> 4;
-        data.pitch    = final_pitch_12b >> 4;
-        data.throttle = throttle_12b >> 4;
-        data.yaw      = final_yaw_12b >> 4;
+        // i will shift data 1 bit for main channels and 4 bit for Potentiometers
+        data.roll     = final_roll_12b >> 1;
+        data.pitch    = final_pitch_12b >> 1;
+        data.throttle = throttle_12b >> 1;
+        data.yaw      = final_yaw_12b >> 1;
         data.aux1     = aux1_12b >> 4;
         data.aux2     = aux2_12b >> 4;
         // finished lets test it
