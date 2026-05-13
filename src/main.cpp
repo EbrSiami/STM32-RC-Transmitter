@@ -89,7 +89,7 @@ const int MAX_TRIM_VALUE = 3072;
 const float R1 = 22.0;
 const float R2 = 6.8;
 const float ADC_MAX_VOLTAGE = 3.3;
-const float CORRECTION_FACTOR = 1.125;
+const float CORRECTION_FACTOR = 1.035;
 const float LOW_BATT_WARNING_VOLTAGE = 7.4;
 
 // i'll put this right here to make loop a bit lighter

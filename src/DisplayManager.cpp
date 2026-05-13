@@ -183,6 +183,33 @@ void showSplashScreen(const char* productName, const unsigned long durationMs) {
     display.clearDisplay();
 }
 
+// ==========================================
+// -- Helper: Draw Trim Indicator --
+// ==========================================
+static void drawTrimIndicator(int x, int y, int trimValue) {
+    const int CENTER = 2048;
+    const int TOLERANCE = 50;  // Tolerance for "centered"
+    
+    if (abs(trimValue - CENTER) <= TOLERANCE) {
+        // Trim is centered - draw filled circle
+        display.fillCircle(x, y, 2, SSD1306_WHITE);
+    } else if (trimValue > CENTER) {
+        // Trim is above center - draw up arrow
+        display.drawPixel(x, y - 2, SSD1306_WHITE);     // top point
+        display.drawPixel(x - 1, y - 1, SSD1306_WHITE); // left
+        display.drawPixel(x + 1, y - 1, SSD1306_WHITE); // right
+        display.drawPixel(x, y, SSD1306_WHITE);         // middle
+        display.drawPixel(x, y + 1, SSD1306_WHITE);     // tail
+    } else {
+        // Trim is below center - draw down arrow
+        display.drawPixel(x, y + 2, SSD1306_WHITE);     // bottom point
+        display.drawPixel(x - 1, y + 1, SSD1306_WHITE); // left
+        display.drawPixel(x + 1, y + 1, SSD1306_WHITE); // right
+        display.drawPixel(x, y, SSD1306_WHITE);         // middle
+        display.drawPixel(x, y - 1, SSD1306_WHITE);     // tail
+    }
+}
+
 // =============================================================================
 // --- Main Rendering Engine ---
 // =============================================================================
@@ -251,8 +278,9 @@ void drawCurrentPage(
             // ==========================================
             // -- Y-Coordinates --
             // ==========================================
-            int topY = 2; // battery
-            int row2Y = 22; // timer and D/R
+            int topY = 2;        // battery & TX status
+            int row2Y = 22;      // timer and D/R
+            int row3Y = 38;      // trim status & mix mode
 
             // ==========================================
             // -- Battery Logic --
@@ -274,6 +302,23 @@ void drawCurrentPage(
             display.print("V");
 
             // ==========================================
+            // -- Radio Status Indicator --
+            // ==========================================
+            display.setCursor(80, topY + 2);
+            if (getRadioStatus()) {
+                display.print("TX:OK");
+            } else {
+                // Blink the error so the user notices!
+                if (millis() % 1000 < 500) {
+                    display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+                    display.print("!TX ERR!");
+                    display.setTextColor(SSD1306_WHITE);
+                } else {
+                    display.print("       ");
+                }
+            }
+
+            // ==========================================
             // -- Timer Logic & Text Formatting --
             // ==========================================
             char timeText[10];
@@ -283,7 +328,6 @@ void drawCurrentPage(
                 if (timerSelection == -1) {
                     sprintf(timeText, "--:--");
                 } else {
-                    // nah you wrong this aint be ai coded, all Marya fault!
                     sprintf(timeText, "%02d:00", timerSelection); 
                 }
             } 
@@ -291,11 +335,9 @@ void drawCurrentPage(
             else if (timerSelection == -1) {
                 sprintf(timeText, "--:--");
             } 
-            // 3- timer is activited or counting or waiting 
+            // 3- timer is activated or counting or waiting 
             else {
                 if (timerIsArmed || timerIsRunning) {
-                    // my previus genius calculations,
-                    // fuck donald trump. fuck pedophiles. fuck israel
                     long remaining = timerValue;
                     if (remaining >= 0) {
                         unsigned long minutes = (unsigned long)remaining / 60000;
@@ -361,20 +403,23 @@ void drawCurrentPage(
             display.setTextColor(SSD1306_WHITE); // Reset text color
 
             // ==========================================
-            // -- Radio Status Indicator --
+            // -- Trim Status & Mix Mode Indicator --
             // ==========================================
-            display.setCursor(77, topY + 2);
-            if (getRadioStatus()) {
-                display.print("TX:OK");
-            } else {
-                // Blink the error so the user notices!
-                if (millis() % 1000 < 500) {
-                    display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-                    display.print("!TX ERR!");
-                    display.setTextColor(SSD1306_WHITE);
-                } else {
-                    display.print("       ");
-                }
+            display.setCursor(15, row3Y);
+            display.setTextColor(SSD1306_WHITE);
+            display.print("T:");
+            
+            // Draw trim indicators (T1, T2, T3)
+            drawTrimIndicator(35, row3Y + 3, settings.trim1);
+            drawTrimIndicator(45, row3Y + 3, settings.trim2);
+            drawTrimIndicator(55, row3Y + 3, settings.trim3);
+            
+            // Draw mix mode on the right side
+            display.setCursor(75, row3Y);
+            display.print("MIX:");
+            const char* mixNames[] = {"NRM", "VT A", "VT B", "DL A", "DL B"};
+            if (settings.mixMode >= 0 && settings.mixMode <= 4) {
+                display.print(mixNames[settings.mixMode]);
             }
 
             // ==========================================
@@ -903,7 +948,7 @@ void drawCurrentPage(
             int xPos;
 
             auto drawExpoBar = [](int y, uint8_t channelValue) {
-                int barWidth = map(channelValue, 0, 255, 0, 40);
+                int barWidth = map(channelValue, 0, 2047, 0, 40);
                 display.drawRect(80, y, 42, 7, SSD1306_WHITE);
                 display.fillRect(81, y + 1, barWidth, 5, SSD1306_WHITE);
             };
