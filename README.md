@@ -5,9 +5,10 @@
 ![PlatformIO](https://img.shields.io/badge/build-PlatformIO-orange?logo=platformio)
 ![STM32](https://img.shields.io/badge/MCU-STM32-blue?logo=stmicroelectronics)
 ![NRF24](https://img.shields.io/badge/radio-NRF24L01+-yellow)
-![Transmitter](https://img.shields.io/badge/firmware-v4.0.1--beta-cyan)
+![Transmitter](https://img.shields.io/badge/firmware-v4.0.1-cyan)
 ![Receiver](https://img.shields.io/badge/receiver-v1.3.2-cyan)
 ![Simulator](https://img.shields.io/badge/simulator-v1.7.0-brightgreen)
+![Status](https://img.shields.io/badge/Status-Stable-red)
 
 **An open-source, STM32-based RC radio system** — transmitter firmware, receiver firmware,
 and a PC ground station for simulator use. Everything you need to build a fully custom
@@ -16,12 +17,18 @@ radio control link from scratch.
 > 📖 **README in other languages:** [فارسی](docs/README_FA.md) · [Русский](docs/README_RU.md)
 
 ---
+## Due to ongoing wartime conditions, I was unable to conduct field flights for a long period, which left version 4.0.1 in a prolonged beta state. Today, after months of waiting, I decided to just say "screw it all" and went out to the flight field. 
+
+## Fortunately, the new firmware version—featuring newly implemented capabilities such as Exponential (Expo), Dual Rates, and more—performed flawlessly. I am proud to announce that this release is officially out of beta and ready for stable use. 
+
+## Flight logs and further development details will be posted soon. Happy flying!
+---
 
 ## What's in this repository
 
 | Component | Target Hardware | Version | Status |
 | :--- | :--- | :--- | :--- |
-| [Transmitter firmware](#transmitter) | STM32F103C**B**T6 / 128 KB clone | v4.0.1-beta | Beta |
+| [Transmitter firmware](#transmitter) | STM32F103C**B**T6 / 128 KB clone | v4.0.1 | Stable |
 | [Receiver firmware](#receiver) | STM32G030F6P6 | v1.3.2 | Stable |
 | [RC Ground Station (Simulator)](#simulator) | Windows PC | v1.7.0 | Stable |
 
